@@ -6,6 +6,7 @@
 #include "endian.h"
 #include "rdm/include/driver.h"
 #include "rdm/include/uid.h"
+#include "soc/periph_defs.h"
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 #include "esp_private/esp_clk.h"
@@ -324,18 +325,33 @@ static void DMX_ISR_ATTR dmx_uart_isr(void *arg) {
   if (task_awoken) portYIELD_FROM_ISR();
 }
 
+const periph_module_t UART_PERIPH_MODULES[] = {    PERIPH_UART0_MODULE,
+    PERIPH_UART1_MODULE,
+    PERIPH_UART2_MODULE};
+
 bool dmx_uart_init(dmx_port_t dmx_num, void *isr_context, int isr_flags) {
   struct dmx_uart_t *uart = &dmx_uart_context[dmx_num];
-
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 3, 0)
+  periph_module_enable(UART_PERIPH_MODULES[dmx_num]);
+#else
   periph_module_enable(uart_periph_signal[dmx_num].module);
+#endif
   if (dmx_num != 0) {  // Default UART port for console
 #if SOC_UART_REQUIRE_CORE_RESET
     // ESP32C3 workaround to prevent UART outputting garbage data
     uart_ll_set_reset_core(uart->dev, true);
-    periph_module_reset(uart_periph_signal[dmx_num].module);
+    #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 3, 0)
+  periph_module_reset(UART_PERIPH_MODULES[dmx_num]);
+#else
+  periph_module_reset(uart_periph_signal[dmx_num].module);
+#endif
     uart_ll_set_reset_core(uart->dev, false);
 #else
-    periph_module_reset(uart_periph_signal[dmx_num].module);
+    #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 3, 0)
+  periph_module_reset(UART_PERIPH_MODULES[dmx_num]);
+#else
+  periph_module_reset(uart_periph_signal[dmx_num].module);
+#endif
 #endif
   }
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
@@ -381,7 +397,11 @@ bool dmx_uart_init(dmx_port_t dmx_num, void *isr_context, int isr_flags) {
 void dmx_uart_deinit(dmx_port_t dmx_num) {
   struct dmx_uart_t *uart = &dmx_uart_context[dmx_num];
   if (uart->num != 0) {  // Default UART port for console
-    periph_module_disable(uart_periph_signal[uart->num].module);
+    #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 3, 0)
+  periph_module_disable(UART_PERIPH_MODULES[dmx_num]);
+#else
+  periph_module_disable(uart_periph_signal[dmx_num].module);
+#endif
   }
 }
 
